@@ -8,7 +8,7 @@ resource "google_project_service" "iam" {
 
 # Creates a service account for this microservice.
 resource "google_service_account" "service" {
-  account_id   = local.service_name
+  account_id   = "${local.service_name}-svc"
   display_name = "Service Account ${local.service_name}"
 
   depends_on = [ google_project_service.iam ]
