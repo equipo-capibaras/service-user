@@ -78,6 +78,33 @@ class TestUser(ParametrizedTestCase):
                 self.assertEqual(cm.records[0].message, f'Multiple users found with email {self.emails[find_idx]}')
                 self.assertEqual(cm.records[0].levelname, 'ERROR')
 
+    def test_get_found(self) -> None:
+        client_id = cast(str, self.faker.uuid4())
+        self.client.collection('clients').document(client_id).set({})
+
+        user = User(
+            id=cast(str, self.faker.uuid4()),
+            client_id=client_id,
+            name=self.faker.name(),
+            email=self.faker.unique.email(),
+            password=pbkdf2_sha256.hash(self.faker.password()),
+        )
+        user_dict = asdict(user)
+        del user_dict['id']
+        del user_dict['client_id']
+        self.client.collection('clients').document(client_id).collection('users').document(user.id).set(user_dict)
+
+        user_db = self.repo.get(user.id, client_id)
+
+        self.assertEqual(user_db, user)
+
+    def test_get_not_found(self) -> None:
+        client_id = cast(str, self.faker.uuid4())
+        user_id = cast(str, self.faker.uuid4())
+        user = self.repo.get(user_id, client_id)
+
+        self.assertIsNone(user)
+
     def test_create(self) -> None:
         client_id = cast(str, self.faker.uuid4())
         self.client.collection('clients').document(client_id).set({})
