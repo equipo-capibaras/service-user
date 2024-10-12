@@ -84,6 +84,6 @@ class UserRegister(MethodView):
         try:
             user_repo.create(user)
         except DuplicateEmailError:
-            return error_response('A user with the email already exists.', 400)
+            return error_response('A user with the email already exists.', 409)
 
         return json_response(user_to_dict(user), 201)

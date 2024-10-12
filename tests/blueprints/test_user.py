@@ -310,10 +310,10 @@ class TestUser(ParametrizedTestCase):
         repo_user: User = cast(Mock, user_repo_mock.create).call_args[0][0]
         self.assertEqual(repo_user.email, register_data['email'])
 
-        self.assertEqual(resp.status_code, 400)
+        self.assertEqual(resp.status_code, 409)
         resp_data = json.loads(resp.get_data())
 
-        self.assertEqual(resp_data['code'], 400)
+        self.assertEqual(resp_data['code'], 409)
         self.assertEqual(resp_data['message'], 'A user with the email already exists.')
 
     def test_register_invalid_client(self) -> None:
