@@ -33,7 +33,7 @@ def is_valid_uuid4(uuid: str) -> bool:
 class UUID4Validator:
     def __call__(self, value: str) -> None:
         if not is_valid_uuid4(value):
-            raise ValidationError('Not a valid UUID.')  # noqa: TRY003
+            raise ValidationError('Not a valid UUID.')
 
 
 def json_response(data: dict[str, Any], status: int) -> Response:

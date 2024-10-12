@@ -9,8 +9,8 @@ from unittest_parametrize import ParametrizedTestCase, parametrize
 from werkzeug.test import TestResponse
 
 from app import create_app
-from models import User
-from repositories import UserRepository
+from models import Client, User
+from repositories import ClientRepository, UserRepository
 from repositories.errors import DuplicateEmailError
 
 
@@ -110,8 +110,12 @@ class TestUser(ParametrizedTestCase):
 
     def test_register_invalid_json(self) -> None:
         user_repo_mock = Mock(UserRepository)
-        with self.app.container.user_repo.override(user_repo_mock):
+        client_repo_mock = Mock(ClientRepository)
+        with self.app.container.user_repo.override(user_repo_mock), self.app.container.client_repo.override(client_repo_mock):
             resp = self.call_register_api('invalid json')
+
+        cast(Mock, user_repo_mock.get).assert_not_called()
+        cast(Mock, user_repo_mock.create).assert_not_called()
 
         self.assertEqual(resp.status_code, 400)
         resp_data = json.loads(resp.get_data())
@@ -139,9 +143,11 @@ class TestUser(ParametrizedTestCase):
         del register_data[field]
 
         user_repo_mock = Mock(UserRepository)
-        with self.app.container.user_repo.override(user_repo_mock):
+        client_repo_mock = Mock(ClientRepository)
+        with self.app.container.user_repo.override(user_repo_mock), self.app.container.client_repo.override(client_repo_mock):
             resp = self.call_register_api(register_data)
 
+        cast(Mock, user_repo_mock.get).assert_not_called()
         cast(Mock, user_repo_mock.create).assert_not_called()
 
         self.assertEqual(resp.status_code, 400)
@@ -168,9 +174,11 @@ class TestUser(ParametrizedTestCase):
         register_data[field] = self.faker.word()
 
         user_repo_mock = Mock(UserRepository)
-        with self.app.container.user_repo.override(user_repo_mock):
+        client_repo_mock = Mock(ClientRepository)
+        with self.app.container.user_repo.override(user_repo_mock), self.app.container.client_repo.override(client_repo_mock):
             resp = self.call_register_api(register_data)
 
+        cast(Mock, user_repo_mock.get).assert_not_called()
         cast(Mock, user_repo_mock.create).assert_not_called()
 
         self.assertEqual(resp.status_code, 400)
@@ -208,9 +216,11 @@ class TestUser(ParametrizedTestCase):
         register_data = self.gen_register_data_with_bounds(field, length)
 
         user_repo_mock = Mock(UserRepository)
-        with self.app.container.user_repo.override(user_repo_mock):
+        client_repo_mock = Mock(ClientRepository)
+        with self.app.container.user_repo.override(user_repo_mock), self.app.container.client_repo.override(client_repo_mock):
             resp = self.call_register_api(register_data)
 
+        cast(Mock, user_repo_mock.get).assert_not_called()
         cast(Mock, user_repo_mock.create).assert_not_called()
 
         self.assertEqual(resp.status_code, 400)
@@ -232,8 +242,12 @@ class TestUser(ParametrizedTestCase):
         register_data = self.gen_register_data_with_bounds(field, length)
 
         user_repo_mock = Mock(UserRepository)
-        with self.app.container.user_repo.override(user_repo_mock):
+        client_repo_mock = Mock(ClientRepository)
+        cast(Mock, client_repo_mock.get).return_value = Client(id=register_data['clientId'], name=self.faker.company())
+        with self.app.container.user_repo.override(user_repo_mock), self.app.container.client_repo.override(client_repo_mock):
             resp = self.call_register_api(register_data)
+
+        cast(Mock, client_repo_mock.get).assert_called_once_with(register_data['clientId'])
 
         cast(Mock, user_repo_mock.create).assert_called_once()
         repo_user: User = cast(Mock, user_repo_mock.create).call_args[0][0]
@@ -259,9 +273,12 @@ class TestUser(ParametrizedTestCase):
         }
 
         user_repo_mock = Mock(UserRepository)
-        with self.app.container.user_repo.override(user_repo_mock):
+        client_repo_mock = Mock(ClientRepository)
+        cast(Mock, client_repo_mock.get).return_value = Client(id=register_data['clientId'], name=self.faker.company())
+        with self.app.container.user_repo.override(user_repo_mock), self.app.container.client_repo.override(client_repo_mock):
             resp = self.call_register_api(register_data)
 
+        cast(Mock, user_repo_mock.get).assert_not_called()
         cast(Mock, user_repo_mock.create).assert_not_called()
 
         self.assertEqual(resp.status_code, 400)
@@ -282,11 +299,43 @@ class TestUser(ParametrizedTestCase):
 
         user_repo_mock = Mock(UserRepository)
         cast(Mock, user_repo_mock.create).side_effect = DuplicateEmailError(register_data['email'])
-        with self.app.container.user_repo.override(user_repo_mock):
+        client_repo_mock = Mock(ClientRepository)
+        cast(Mock, client_repo_mock.get).return_value = Client(id=register_data['clientId'], name=self.faker.company())
+        with self.app.container.user_repo.override(user_repo_mock), self.app.container.client_repo.override(client_repo_mock):
             resp = self.call_register_api(register_data)
+
+        cast(Mock, client_repo_mock.get).assert_called_once_with(register_data['clientId'])
+
+        cast(Mock, user_repo_mock.create).assert_called_once()
+        repo_user: User = cast(Mock, user_repo_mock.create).call_args[0][0]
+        self.assertEqual(repo_user.email, register_data['email'])
 
         self.assertEqual(resp.status_code, 400)
         resp_data = json.loads(resp.get_data())
 
         self.assertEqual(resp_data['code'], 400)
         self.assertEqual(resp_data['message'], 'A user with the email already exists.')
+
+    def test_register_invalid_client(self) -> None:
+        register_data = {
+            'clientId': cast(str, self.faker.uuid4()),
+            'name': self.faker.name(),
+            'email': self.faker.email(),
+            'password': self.faker.password(),
+        }
+
+        user_repo_mock = Mock(UserRepository)
+        client_repo_mock = Mock(ClientRepository)
+        cast(Mock, client_repo_mock.get).return_value = None
+        with self.app.container.user_repo.override(user_repo_mock), self.app.container.client_repo.override(client_repo_mock):
+            resp = self.call_register_api(register_data)
+
+        cast(Mock, client_repo_mock.get).assert_called_once_with(register_data['clientId'])
+
+        cast(Mock, user_repo_mock.create).assert_not_called()
+
+        self.assertEqual(resp.status_code, 400)
+        resp_data = json.loads(resp.get_data())
+
+        self.assertEqual(resp_data['code'], 400)
+        self.assertEqual(resp_data['message'], 'Invalid value for clientId: Client does not exist.')

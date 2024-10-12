@@ -12,7 +12,7 @@ from passlib.hash import pbkdf2_sha256
 
 from containers import Container
 from models import User
-from repositories import UserRepository
+from repositories import ClientRepository, UserRepository
 from repositories.errors import DuplicateEmailError
 
 from .util import UUID4Validator, class_route, error_response, json_response, requires_token, validation_error_response
@@ -55,7 +55,11 @@ class RegisterBody:
 class UserRegister(MethodView):
     init_every_request = False
 
-    def post(self, user_repo: UserRepository = Provide[Container.user_repo]) -> Response:
+    def post(
+        self,
+        user_repo: UserRepository = Provide[Container.user_repo],
+        client_repo: ClientRepository = Provide[Container.client_repo],
+    ) -> Response:
         auth_schema = marshmallow_dataclass.class_schema(RegisterBody)()
         req_json = request.get_json(silent=True)
         if req_json is None:
@@ -65,6 +69,9 @@ class UserRegister(MethodView):
             data: RegisterBody = auth_schema.load(req_json)
         except ValidationError as err:
             return validation_error_response(err)
+
+        if client_repo.get(data.clientId) is None:
+            return error_response('Invalid value for clientId: Client does not exist.', 400)
 
         user = User(
             id=str(uuid.uuid4()),

@@ -11,6 +11,8 @@ marshmallow_dataclass==8.7.1
 mypy==1.11.2
 passlib==1.7.4
 PyJWT[crypto]==2.9.0
+requests==2.32.3
+responses==0.25.3
 ruff==0.6.9
 tightwrap==24.3.0
 types-passlib==1.7.7.20240819
