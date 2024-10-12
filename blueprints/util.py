@@ -1,6 +1,7 @@
 import json
 from collections.abc import Callable
 from typing import Any, cast
+from uuid import UUID
 
 from flask import Blueprint, Request, Response, request
 from flask.views import MethodView
@@ -18,6 +19,21 @@ def class_route(blueprint: Blueprint, rule: str, **options: Any) -> Callable[[ty
         return cls
 
     return decorator
+
+
+def is_valid_uuid4(uuid: str) -> bool:
+    try:
+        UUID(uuid, version=4)
+    except ValueError:
+        return False
+
+    return True
+
+
+class UUID4Validator:
+    def __call__(self, value: str) -> None:
+        if not is_valid_uuid4(value):
+            raise ValidationError('Not a valid UUID.')
 
 
 def json_response(data: dict[str, Any], status: int) -> Response:

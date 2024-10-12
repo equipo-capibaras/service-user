@@ -29,6 +29,9 @@ def create_app() -> FlaskMicroservice:
             as_=lambda x: None if x is None else '-----BEGIN PRIVATE KEY-----\n' + x + '\n-----END PRIVATE KEY-----\n',
         )  # pragma: no cover
 
+    if 'URL_CLIENT_SVC' in os.environ:
+        app.container.config.svc.client.url.from_env('URL_CLIENT_SVC')  # pragma: no cover
+
     if os.getenv('ENABLE_CLOUD_TRACE') == '1':
         setup_cloud_trace(app)  # pragma: no cover
 

@@ -11,6 +11,7 @@ from passlib.hash import pbkdf2_sha256
 from unittest_parametrize import ParametrizedTestCase, parametrize
 
 from models import User
+from repositories.errors import DuplicateEmailError
 from repositories.firestore import FirestoreUserRepository
 
 FIRESTORE_DATABASE = '(default)'
@@ -131,6 +132,42 @@ class TestUser(ParametrizedTestCase):
         del user_dict['id']
         del user_dict['client_id']
         self.assertEqual(doc.to_dict(), user_dict)
+
+    def test_create_duplicate(self) -> None:
+        client_id = cast(str, self.faker.uuid4())
+        self.client.collection('clients').document(client_id).set({})
+
+        user1 = User(
+            id=cast(str, self.faker.uuid4()),
+            client_id=client_id,
+            name=self.faker.name(),
+            email=self.faker.unique.email(),
+            password=pbkdf2_sha256.hash(self.faker.password()),
+        )
+        user_dict = asdict(user1)
+        del user_dict['id']
+        del user_dict['client_id']
+        self.client.collection('clients').document(client_id).collection('users').document(user1.id).set(user_dict)
+
+        user2 = User(
+            id=cast(str, self.faker.uuid4()),
+            client_id=client_id,
+            name=self.faker.name(),
+            email=user1.email,
+            password=pbkdf2_sha256.hash(self.faker.password()),
+        )
+
+        with self.assertRaises(DuplicateEmailError) as context:
+            self.repo.create(user2)
+
+        self.assertEqual(str(context.exception), f"A user with the email '{user2.email}' already exists.")
+
+        user_ref = cast(
+            DocumentReference,
+            self.client.collection('clients').document(client_id).collection('users').document(user2.id),
+        )
+        doc = user_ref.get()
+        self.assertFalse(doc.exists)
 
     def test_delete_all(self) -> None:
         users: list[User] = []
