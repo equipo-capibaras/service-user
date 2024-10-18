@@ -3,7 +3,7 @@ import os
 from flask import Flask
 from gcp_microservice_utils import GcpAuthToken, setup_apigateway, setup_cloud_logging, setup_cloud_trace
 
-from blueprints import BlueprintAuth, BlueprintHealth, BlueprintReset, BlueprintUser
+from blueprints import BlueprintAuth, BlueprintBackup, BlueprintHealth, BlueprintReset, BlueprintUser
 from containers import Container
 
 
@@ -19,6 +19,12 @@ def create_app() -> FlaskMicroservice:
     app.container = Container()
 
     app.container.config.firestore.database.from_env('FIRESTORE_DATABASE', '(default)')
+
+    if 'K_SERVICE' in os.environ:  # pragma: no cover
+        import google.auth
+
+        _, project_id = google.auth.default()  # type: ignore[no-untyped-call]
+        app.container.config.project_id.from_value(project_id)
 
     if 'JWT_ISSUER' in os.environ:  # pragma: no cover
         app.container.config.jwt.issuer.from_env('JWT_ISSUER')
@@ -41,6 +47,7 @@ def create_app() -> FlaskMicroservice:
     setup_apigateway(app)
 
     app.register_blueprint(BlueprintAuth)
+    app.register_blueprint(BlueprintBackup)
     app.register_blueprint(BlueprintHealth)
     app.register_blueprint(BlueprintReset)
     app.register_blueprint(BlueprintUser)
