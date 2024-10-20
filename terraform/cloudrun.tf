@@ -93,12 +93,13 @@ resource "google_cloud_run_v2_service" "default" {
   depends_on = [ google_project_service.cloudrun ]
 }
 
-# Allows the API Gateway service account to invoke this microservice.
+# Allows the API Gateway and Backup service account to invoke this microservice.
 data "google_iam_policy" "default" {
   binding {
     role = "roles/run.invoker"
     members = [
-      data.google_service_account.apigateway.member
+      data.google_service_account.apigateway.member,
+      data.google_service_account.backup.member
     ]
   }
 }
