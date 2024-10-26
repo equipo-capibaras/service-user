@@ -69,21 +69,38 @@ class TestUser(ParametrizedTestCase):
 
         self.assertEqual(resp_data, {'code': 401, 'message': f'{missing_field} is missing in token'})
 
-    def test_info_user_not_found(self) -> None:
+    @parametrize(
+        'api_method',
+        [
+            ('info',),
+            ('get',),
+        ],
+    )
+    def test_info_user_not_found(self, api_method: str) -> None:
         token = self.gen_token()
 
         user_repo_mock = Mock(UserRepository)
 
         cast(Mock, user_repo_mock.get).return_value = None
         with self.app.container.user_repo.override(user_repo_mock):
-            resp = self.call_info_api(token)
+            if api_method == 'info':
+                resp = self.call_info_api(token)
+            else:
+                resp = self.client.get(f'/api/v1/users/{token["cid"]}/{token["sub"]}')
 
         self.assertEqual(resp.status_code, 404)
         resp_data = json.loads(resp.get_data())
 
         self.assertEqual(resp_data, {'code': 404, 'message': 'User not found'})
 
-    def test_info_user_found(self) -> None:
+    @parametrize(
+        'api_method',
+        [
+            ('info',),
+            ('get',),
+        ],
+    )
+    def test_info_user_found(self, api_method: str) -> None:
         token = self.gen_token()
 
         user = User(
@@ -98,7 +115,10 @@ class TestUser(ParametrizedTestCase):
 
         cast(Mock, user_repo_mock.get).return_value = user
         with self.app.container.user_repo.override(user_repo_mock):
-            resp = self.call_info_api(token)
+            if api_method == 'info':
+                resp = self.call_info_api(token)
+            else:
+                resp = self.client.get(f'/api/v1/users/{token["cid"]}/{token["sub"]}')
 
         self.assertEqual(resp.status_code, 200)
         resp_data = json.loads(resp.get_data())
@@ -339,3 +359,28 @@ class TestUser(ParametrizedTestCase):
 
         self.assertEqual(resp_data['code'], 400)
         self.assertEqual(resp_data['message'], 'Invalid value for clientId: Client does not exist.')
+
+    @parametrize(
+        ['param'],
+        [
+            ('client_id',),
+            ('user_id',),
+        ],
+    )
+    def test_get_invalid(self, param: str) -> None:
+        client_id = self.faker.word() if param == 'client_id' else cast(str, self.faker.uuid4())
+        user_id = self.faker.word() if param == 'user_id' else cast(str, self.faker.uuid4())
+
+        client_repo_mock = Mock(ClientRepository)
+        cast(Mock, client_repo_mock.get).return_value = None
+
+        with self.app.container.client_repo.override(client_repo_mock):
+            resp = self.client.get(f'/api/v1/users/{client_id}/{user_id}')
+
+        cast(Mock, client_repo_mock.get).assert_not_called()
+
+        self.assertEqual(resp.status_code, 400)
+        resp_data = json.loads(resp.get_data())
+
+        self.assertEqual(resp_data['code'], 400)
+        self.assertEqual(resp_data['message'], 'Invalid client ID.' if param == 'client_id' else 'Invalid user ID.')
