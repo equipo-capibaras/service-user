@@ -133,4 +133,6 @@ class TestAuth(ParametrizedTestCase):
         self.assertEqual(decoded_token['iss'], self.jwt_issuer)
         self.assertEqual(decoded_token['sub'], user.id)
         self.assertEqual(decoded_token['cid'], user.client_id)
+        self.assertEqual(decoded_token['role'], 'user')
         self.assertEqual(decoded_token['aud'], 'user')
+        self.assertEqual(decoded_token['email'], user.email)
