@@ -39,3 +39,11 @@ data "google_service_account" "backup" {
 
   depends_on = [ google_project_service.iam ]
 }
+
+# Retrieves the service account of the incidentquery microservice.
+# This is defined as part of the incidentquery microservice
+# This service account is given permissions to access this microservice
+data "google_service_account" "incidentquery" {
+  account_id   = "incidentquery"
+  depends_on = [ google_project_service.iam ]
+}

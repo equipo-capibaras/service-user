@@ -22,6 +22,8 @@ class JWTPayload(typing.TypedDict):
     iss: str
     sub: str
     cid: str
+    email: str
+    role: str
     aud: str
     iat: int
     exp: int
@@ -66,6 +68,8 @@ class AuthEmployee(MethodView):
             'iss': jwt_issuer,
             'sub': user.id,
             'cid': user.client_id,
+            'email': user.email,
+            'role': 'user',
             'aud': 'user',
             'iat': int(time_issued.timestamp()),
             'exp': int(time_expiry.timestamp()),

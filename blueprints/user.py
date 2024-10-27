@@ -15,7 +15,15 @@ from models import User
 from repositories import ClientRepository, UserRepository
 from repositories.errors import DuplicateEmailError
 
-from .util import UUID4Validator, class_route, error_response, json_response, requires_token, validation_error_response
+from .util import (
+    UUID4Validator,
+    class_route,
+    error_response,
+    is_valid_uuid4,
+    json_response,
+    requires_token,
+    validation_error_response,
+)
 
 blp = Blueprint('Users', __name__)
 
@@ -36,6 +44,26 @@ class UserInfo(MethodView):
     @requires_token
     def get(self, token: dict[str, Any], user_repo: UserRepository = Provide[Container.user_repo]) -> Response:
         user = user_repo.get(user_id=token['sub'], client_id=token['cid'])
+
+        if user is None:
+            return error_response('User not found', 404)
+
+        return json_response(user_to_dict(user), 200)
+
+
+# Internal only
+@class_route(blp, '/api/v1/users/<client_id>/<user_id>')
+class RetrieveUser(MethodView):
+    init_every_request = False
+
+    def get(self, client_id: str, user_id: str, user_repo: UserRepository = Provide[Container.user_repo]) -> Response:
+        if not is_valid_uuid4(client_id):
+            return error_response('Invalid client ID.', 400)
+
+        if not is_valid_uuid4(user_id):
+            return error_response('Invalid user ID.', 400)
+
+        user = user_repo.get(user_id=user_id, client_id=client_id)
 
         if user is None:
             return error_response('User not found', 404)
