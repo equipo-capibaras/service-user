@@ -29,6 +29,7 @@ blp = Blueprint('Users', __name__)
 
 USER_NOT_FOUND = 'User not found'
 
+
 def user_to_dict(user: User) -> dict[str, Any]:
     return {
         'id': user.id,
