@@ -27,6 +27,8 @@ from .util import (
 
 blp = Blueprint('Users', __name__)
 
+USER_NOT_FOUND = 'User not found'
+
 
 def user_to_dict(user: User) -> dict[str, Any]:
     return {
@@ -35,6 +37,12 @@ def user_to_dict(user: User) -> dict[str, Any]:
         'name': user.name,
         'email': user.email,
     }
+
+
+# Find by email validation class
+@dataclass
+class FindByEmailBody:
+    email: str = field(metadata={'validate': [marshmallow.validate.Email(), marshmallow.validate.Length(min=1, max=60)]})
 
 
 @class_route(blp, '/api/v1/users/me')
@@ -46,7 +54,7 @@ class UserInfo(MethodView):
         user = user_repo.get(user_id=token['sub'], client_id=token['cid'])
 
         if user is None:
-            return error_response('User not found', 404)
+            return error_response(USER_NOT_FOUND, 404)
 
         return json_response(user_to_dict(user), 200)
 
@@ -66,7 +74,7 @@ class RetrieveUser(MethodView):
         user = user_repo.get(user_id=user_id, client_id=client_id)
 
         if user is None:
-            return error_response('User not found', 404)
+            return error_response(USER_NOT_FOUND, 404)
 
         return json_response(user_to_dict(user), 200)
 
@@ -115,3 +123,29 @@ class UserRegister(MethodView):
             return error_response('A user with the email already exists.', 409)
 
         return json_response(user_to_dict(user), 201)
+
+
+# Internal only
+@class_route(blp, '/api/v1/users/detail')
+class FindUser(MethodView):
+    init_every_request = False
+
+    def post(self, user_repo: UserRepository = Provide[Container.user_repo]) -> Response:
+        # Parse request body
+        find_schema = marshmallow_dataclass.class_schema(FindByEmailBody)()
+        req_json = request.get_json(silent=True)
+        if req_json is None:
+            return error_response('The request body could not be parsed as valid JSON.', 400)
+
+        try:
+            data: FindByEmailBody = find_schema.load(req_json)
+        except ValidationError as err:
+            return validation_error_response(err)
+
+        # Find user by email
+        user = user_repo.find_by_email(data.email)
+
+        if user is None:
+            return error_response(USER_NOT_FOUND, 404)
+
+        return json_response(user_to_dict(user), 200)
