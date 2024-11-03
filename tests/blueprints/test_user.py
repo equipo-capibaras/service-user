@@ -43,6 +43,13 @@ class TestUser(ParametrizedTestCase):
             content_type='application/json',
         )
 
+    def call_find_by_email_api(self, body: dict[str, Any] | str) -> TestResponse:
+        return self.client.post(
+            '/api/v1/users/detail',
+            data=body if isinstance(body, str) else json.dumps(body),
+            content_type='application/json',
+        )
+
     def test_info_no_token(self) -> None:
         resp = self.call_info_api(None)
 
@@ -384,3 +391,67 @@ class TestUser(ParametrizedTestCase):
 
         self.assertEqual(resp_data['code'], 400)
         self.assertEqual(resp_data['message'], 'Invalid client ID.' if param == 'client_id' else 'Invalid user ID.')
+
+    def test_find_by_email_invalid_json(self) -> None:
+        user_repo_mock = Mock(UserRepository)
+        with self.app.container.user_repo.override(user_repo_mock):
+            resp = self.call_find_by_email_api('invalid json')
+
+        cast(Mock, user_repo_mock.find_by_email).assert_not_called()
+
+        self.assertEqual(resp.status_code, 400)
+        resp_data = json.loads(resp.get_data())
+
+        self.assertEqual(resp_data['code'], 400)
+        self.assertEqual(resp_data['message'], 'The request body could not be parsed as valid JSON.')
+
+    def test_find_by_email_user_found(self) -> None:
+        email = self.faker.email()
+        user = User(
+            id=cast(str, self.faker.uuid4()),
+            client_id=cast(str, self.faker.uuid4()),
+            name=self.faker.name(),
+            email=email,
+            password=pbkdf2_sha256.hash(self.faker.password()),
+        )
+
+        user_repo_mock = Mock(UserRepository)
+        cast(Mock, user_repo_mock.find_by_email).return_value = user
+        with self.app.container.user_repo.override(user_repo_mock):
+            resp = self.call_find_by_email_api({'email': email})
+
+        self.assertEqual(resp.status_code, 200)
+        resp_data = json.loads(resp.get_data())
+
+        self.assertEqual(resp_data['id'], user.id)
+        self.assertEqual(resp_data['clientId'], user.client_id)
+        self.assertEqual(resp_data['name'], user.name)
+        self.assertEqual(resp_data['email'], user.email)
+
+    def test_find_by_email_user_not_found(self) -> None:
+        email = self.faker.email()
+
+        user_repo_mock = Mock(UserRepository)
+        cast(Mock, user_repo_mock.find_by_email).return_value = None
+        with self.app.container.user_repo.override(user_repo_mock):
+            resp = self.call_find_by_email_api({'email': email})
+
+        self.assertEqual(resp.status_code, 404)
+        resp_data = json.loads(resp.get_data())
+
+        self.assertEqual(resp_data, {'code': 404, 'message': 'User not found'})
+
+    def test_find_by_email_invalid_email_format(self) -> None:
+        invalid_email = 'invalid-email-format'
+
+        user_repo_mock = Mock(UserRepository)
+        with self.app.container.user_repo.override(user_repo_mock):
+            resp = self.call_find_by_email_api({'email': invalid_email})
+
+        cast(Mock, user_repo_mock.find_by_email).assert_not_called()
+
+        self.assertEqual(resp.status_code, 400)
+        resp_data = json.loads(resp.get_data())
+
+        self.assertEqual(resp_data['code'], 400)
+        self.assertEqual(resp_data['message'], 'Invalid value for email: Not a valid email address.')
