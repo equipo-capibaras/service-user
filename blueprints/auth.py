@@ -62,7 +62,7 @@ class AuthEmployee(MethodView):
             return error_response('Invalid username or password.', 401)
 
         time_issued = datetime.datetime.now(datetime.UTC)
-        time_expiry = time_issued + datetime.timedelta(minutes=15)
+        time_expiry = time_issued + datetime.timedelta(minutes=60)
 
         payload: JWTPayload = {
             'iss': jwt_issuer,
